@@ -2,28 +2,48 @@
 ---
 version: '3'
 services:
+  test_db:
+    image: aleksi/test_db:1.1.0
+    volumes:
+      - test_db_mysql:/test_db/mysql/world:ro
+
   proxysql:
-    image: ${PROXYSQL_IMAGE:-perconalab/proxysql:1.3.6}
+    image: ${PROXYSQL_IMAGE:-percona/proxysql:latest}
     environment:
       # those environment variables are not actually required by ProxySQL, but entrypoint erroneously checks them
       - CLUSTER_NAME=dummy
       - DISCOVERY_SERVICE=dummy
     ports:
-      - 127.0.0.1:13306:3306  # user interface
-      - 127.0.0.1:16032:6032  # admin interface
-  mysql:
-    image: mysql:8.0
+      - 3306:3306  # user interface
+      - 6032:6032  # admin interface
+    volumes:
+      - ./testdata/${PROXYSQL_CNF:-proxysql1.cnf}:${PROXYSQL_CNF_DEST:-/etc/proxysql.cnf}:ro
+
+  master:
+    image: ${MASTER_IMAGE:-percona:5.7}
+    command: >
+      --server-id=1 --log-bin=binlog
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
       - MYSQL_USER=monitor
       - MYSQL_PASSWORD=monitor
-    # ports:
-    #   - 127.0.0.1:23306:3306
-  percona-server:
-    image: percona/percona-server:5.7
+    ports:
+      - 3307:3306
+    volumes:
+      - test_db_mysql:/docker-entrypoint-initdb.d/:ro
+
+  slave:
+    image: ${SLAVE_IMAGE:-percona:5.7}
+    command: >
+      --server-id=2 --log-bin=binlog
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
       - MYSQL_USER=monitor
       - MYSQL_PASSWORD=monitor
-    # ports:
-    #   - 127.0.0.1:33306:3306
+    ports:
+      - 3308:3306
+    volumes:
+      - test_db_mysql:/docker-entrypoint-initdb.d/:ro
+
+volumes:
+  test_db_mysql:

@@ -1,3 +1,50 @@
+CHANGE MASTER TO master_host = '127.0.0.1', master_port = 3307, master_user = 'replica', master_password = 'replica';
+RESET MASTER;
+
+CREATE USER 'replica'@'%' IDENTIFIED BY 'replica';
+GRANT REPLICATION SLAVE ON *.* TO 'replica'@'%';
+RESET MASTER;
+
+CHANGE MASTER TO master_host = 'master', master_port = 3306, master_user = 'replica', master_password = 'replica'
+START SLAVE;
+SHOW SLAVE STATUS\G
+
+CREATE USER 'app'@'%' IDENTIFIED BY 'app';
+GRANT ALL ON *.* TO 'app'@'%';
+
+
+
+mysql -h 127.0.0.1 -u proxysql-admin -pproxysql-admin -P 6032 --default-auth=mysql_native_password
+
+
+
+delete from mysql_users where username='app';
+insert into mysql_users (username,password,active,default_hostgroup,default_schema,transaction_persistent,comment) values ('app','app',1,100,'mysql',1,'app test user');
+LOAD MYSQL USERS TO RUNTIME;SAVE MYSQL USERS TO DISK;
+
+
+
+delete from mysql_servers where hostgroup_id in (100,101);
+INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight,max_connections,comment) VALUES
+('master',100,3306,10000,2000,'test');
+INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight,max_connections,comment) VALUES
+('slave',101,3306,100,2000,'test');
+
+LOAD MYSQL SERVERS TO RUNTIME; SAVE MYSQL SERVERS TO DISK;
+
+
+
+delete from mysql_query_rules where rule_id in(1,2);
+insert into mysql_query_rules (rule_id,username,destination_hostgroup,active,retries,match_digest,apply) values(1,'app',100,1,3,'^SELECT.*FOR UPDATE',1);
+insert into mysql_query_rules (rule_id,username,destination_hostgroup,active,retries,match_digest,apply) values(2,'app',100,1,3,'^SELECT.*@@',1);
+insert into mysql_query_rules (rule_id,username,destination_hostgroup,active,retries,match_digest,apply) values(3,'app',101,1,3,'^SELECT.*$',1);
+
+load mysql query rules to run;
+save mysql query rules to disk;
+
+
+
+
 # Percona ProxySQL Exporter
 
 [![Release](https://github-release-version.herokuapp.com/github/percona/proxysql_exporter/release.svg?style=flat)](https://github.com/percona/proxysql_exporter/releases/latest)
@@ -10,12 +57,23 @@ Supported versions: 1.2 and 1.3.
 
 ## Building and running
 
+### Prerequisites:
+
+* [Go compiler](https://golang.org/dl/)
+
 ### Building
 
-```bash
-make
-```
+1. Get the code from the Percona repository:
 
+    ```bash
+    go get -u github.com/percona/proxysql_exporter
+    ```
+ 2. Switch to the buld directory and run `make`:
+
+    ```bash
+    cd ${GOPATH-$HOME/go}/src/github.com/percona/proxysql_exporter
+    make
+    ```
 
 ### Running
 
@@ -32,7 +90,6 @@ export HTTP_AUTH='user:password'
 ```
 
 Note, using `stats` user requires ProxySQL 1.2.4 or higher. Otherwise, use `admin` user.
-
 
 ### Collector Flags
 

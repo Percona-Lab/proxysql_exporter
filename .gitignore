@@ -1,3 +1,5 @@
+/.idea/
+/.vscode/
+
 proxysql_exporter
 coverage.txt
-.idea
