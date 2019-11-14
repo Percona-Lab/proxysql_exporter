@@ -64,5 +64,10 @@ promu:
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(subst aarch64,arm64,$(shell uname -m)))) \
 		$(GO) get -u github.com/prometheus/promu
 
+env-up:                         ## Start development environment.
+	docker-compose up --force-recreate --renew-anon-volumes --remove-orphans
+
+env-down:                       ## Stop development environment.
+	docker-compose down --volumes --remove-orphans
 
 .PHONY: all style format build test vet tarball docker promu

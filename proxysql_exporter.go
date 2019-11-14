@@ -1,4 +1,4 @@
-// Copyright 2016-2017 Percona LLC
+// Copyright 2016-2019 Percona LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 )
@@ -41,6 +40,7 @@ var (
 	mysqlConnectionPoolF         = flag.Bool("collect.mysql_connection_pool", true, "Collect from stats_mysql_connection_pool.")
 	mysqlConnectionListF         = flag.Bool("collect.mysql_connection_list", true, "Collect connection list from stats_mysql_processlist.")
 	mysqlDetailedConnectionListF = flag.Bool("collect.detailed.stats_mysql_processlist", false, "Collect detailed connection list from stats_mysql_processlist.")
+	mysqlCommandCountersF        = flag.Bool("collect.mysql_command_counters", false, "Collect statistics from stats_mysql_commands_counters.")
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
 )
 
@@ -67,8 +67,8 @@ func main() {
 
 	log.Infof("Starting %s %s for %s", program, version.Version, dsn)
 
-	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlDetailedConnectionListF, *memoryMetricsF)
+	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlDetailedConnectionListF, *mysqlCommandCountersF, *memoryMetricsF)
 	prometheus.MustRegister(exporter)
 
-	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, promhttp.ContinueOnError)
+	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, exporter_shared.DefaultMetricsHandler())
 }

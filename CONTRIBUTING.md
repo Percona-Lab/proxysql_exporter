@@ -7,7 +7,7 @@ The easiest way to make a local development setup is to use Docker Compose.
 ```
 docker-compose up
 make all testall
-export DATA_SOURCE_NAME='admin:admin@tcp(127.0.0.1:16032)/'
+export DATA_SOURCE_NAME='proxysql-admin:proxysql-admin@tcp(127.0.0.1:6032)/'
 ./proxysql_exporter
 ```
 
