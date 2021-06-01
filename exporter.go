@@ -449,7 +449,6 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 	}
 	defer rows.Close()
 
-
 	for rows.Next() {
 		var res processListResult
 
@@ -480,44 +479,44 @@ const memoryMetricsQuery = "select Variable_Name, Variable_Value  from stats_mem
 
 var memoryMetricsMetrics = map[string]*metric{
 	"jemalloc_allocated": {
-		name: "jemalloc_allocated",
+		name:      "jemalloc_allocated",
 		valueType: prometheus.GaugeValue,
-		help: "bytes allocated by the application",
+		help:      "bytes allocated by the application",
 	},
 	"jemalloc_active": {
-		name: "jemalloc_active",
+		name:      "jemalloc_active",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in pages allocated by the application",
+		help:      "bytes in pages allocated by the application",
 	},
 	"jemalloc_mapped": {
-		name: "jemalloc_mapped",
+		name:      "jemalloc_mapped",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in extents mapped by the allocator",
+		help:      "bytes in extents mapped by the allocator",
 	},
 	"jemalloc_metadata": {
-		name: "jemalloc_metadata",
+		name:      "jemalloc_metadata",
 		valueType: prometheus.GaugeValue,
-		help: "bytes dedicated to metadata",
+		help:      "bytes dedicated to metadata",
 	},
 	"jemalloc_resident": {
-		name: "jemalloc_resident",
+		name:      "jemalloc_resident",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in physically resident data pages mapped by the allocator",
+		help:      "bytes in physically resident data pages mapped by the allocator",
 	},
 	"auth_memory": {
-		name: "auth_memory",
+		name:      "auth_memory",
 		valueType: prometheus.GaugeValue,
-		help: "memory used by the authentication module to store user credentials and attributes",
+		help:      "memory used by the authentication module to store user credentials and attributes",
 	},
 	"sqlite3_memory_bytes": {
-		name: "sqlite3_memory_bytes",
+		name:      "sqlite3_memory_bytes",
 		valueType: prometheus.GaugeValue,
-		help: "memory used by the embedded SQLite",
+		help:      "memory used by the embedded SQLite",
 	},
 	"query_digest_memory": {
-		name: "query_digest_memory",
+		name:      "query_digest_memory",
 		valueType: prometheus.GaugeValue,
-		help: "memory used to store data related to stats_mysql_query_digest",
+		help:      "memory used to store data related to stats_mysql_query_digest",
 	},
 }
 

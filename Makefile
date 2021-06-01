@@ -15,7 +15,7 @@
 GO           := go
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
 PROMU        := $(FIRST_GOPATH)/bin/promu -v
-pkgs          = $(shell $(GO) list ./... | grep -v /vendor/)
+pkgs          = ./...
 
 PREFIX              ?= $(shell pwd)
 BIN_DIR             ?= $(shell pwd)
@@ -29,7 +29,7 @@ all: format build test
 
 style:
 	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
+	@! gofmt -d $(shell find . -path ./... -prune -o -name '*.go' -print) | grep '^'
 
 test:
 	@echo ">> running tests"
