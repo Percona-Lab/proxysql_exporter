@@ -41,6 +41,7 @@ Name                                       | Description
 `collect.mysql_connection_list`            | Collect connection list from stats_mysql_processlist. (default true)
 `collect.mysql_connection_pool`            | Collect from stats_mysql_connection_pool. (default true)
 `collect.mysql_status`                     | Collect from stats_mysql_global (SHOW MYSQL STATUS). (default true)
+`collect.runtime_mysql_servers`            | Collect from runtime_mysql_servers - need admin credentials. (default false)
 `collect.stats_memory_metrics`             | Collect memory metrics from stats_memory_metrics.
 
 

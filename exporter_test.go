@@ -366,6 +366,124 @@ func TestScrapeMySQLConnectionPoolError(t *testing.T) {
 	_ = *readMetric(<-ch2)
 }
 
+func TestScrapeMySQLRuntimeServers(t *testing.T) {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
+		for c, m := range mySQLruntimeServersMetrics {
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+		}
+	})
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"hostgroup_id", "hostname", "port", "gtid_port", "status", "weight", "compression", "max_connections", "max_replication_lag",
+		"use_ssl", "max_latency_ms"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("0", "10.91.142.80", "3306", "0", "ONLINE", "1", "0", "600", "0", "0", "0").
+		AddRow("0", "10.91.142.82", "3306", "0", "SHUNNED", "1", "0", "600", "0", "0", "0").
+		AddRow("1", "10.91.142.88", "3306", "0", "OFFLINE_SOFT", "1", "0", "600", "0", "0", "0").
+		AddRow("2", "10.91.142.89", "3306", "0", "OFFLINE_HARD", "1", "0", "600", "0", "0", "0")
+	mock.ExpectQuery(sanitizeQuery(mySQLruntimeServersQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeMySQLRuntimeServers(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+
+	counterExpected := []metricResult{
+		{"proxysql_runtime_servers_status", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306", "gtid_port": "0"}, 1, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_weight", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306", "gtid_port": "0"}, 1, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_compression", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_connections", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306", "gtid_port": "0"}, 600, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_replication_lag", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_use_ssl", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_latency_ms", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+
+		{"proxysql_runtime_servers_status", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306", "gtid_port": "0"}, 2, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_weight", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306", "gtid_port": "0"}, 1, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_compression", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_connections", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306", "gtid_port": "0"}, 600, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_replication_lag", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_use_ssl", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_latency_ms", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+
+		{"proxysql_runtime_servers_status", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306", "gtid_port": "0"}, 3, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_weight", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306", "gtid_port": "0"}, 1, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_compression", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_connections", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306", "gtid_port": "0"}, 600, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_replication_lag", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_use_ssl", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_latency_ms", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+
+		{"proxysql_runtime_servers_status", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306", "gtid_port": "0"}, 4, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_weight", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306", "gtid_port": "0"}, 1, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_compression", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_connections", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306", "gtid_port": "0"}, 600, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_replication_lag", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_use_ssl", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+		{"proxysql_runtime_servers_max_latency_ms", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306", "gtid_port": "0"}, 0, dto.MetricType_GAUGE},
+	}
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
+		for _, expect := range counterExpected {
+			got := *readMetric(<-ch)
+			cv.So(got, convey.ShouldResemble, expect)
+		}
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestScrapeMySQLRuntimeServersError(t *testing.T) {
+	db1, mock1, err1 := sqlmock.New()
+	if err1 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err1)
+	}
+	defer db1.Close()
+
+	mock1.ExpectQuery(mySQLruntimeServersQuery).WillReturnError(errors.New("an error"))
+	ch1 := make(chan prometheus.Metric)
+
+	go func() {
+		scrapeMySQLRuntimeServers(db1, ch1)
+		close(ch1)
+	}()
+
+	mySQLruntimeServersMetrics = map[string]*metric{
+		"hostgroup_id": {},
+		"max_latency_ms": {"max_latency_ms", prometheus.GaugeValue,
+			"Ping time."},
+	}
+
+	db2, mock2, err2 := sqlmock.New()
+	if err2 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err2)
+	}
+	defer db2.Close()
+
+	columns := []string{"hostgroup_id", "hostname", "port", "gtid_port", "status", "weight", "compression", "max_connections", "max_replication_lag",
+		"use_ssl", "max_latency_ms"}
+	rows := sqlmock.NewRows(columns).AddRow("0", "10.91.142.80", "3306", "0", "ONLINE", "1", "0", "600", "0", "0", "0")
+	mock2.ExpectQuery(sanitizeQuery(mySQLruntimeServersQuery)).WillReturnRows(rows)
+
+	ch2 := make(chan prometheus.Metric)
+	go func() {
+		scrapeMySQLRuntimeServers(db2, ch2)
+		close(ch2)
+	}()
+
+	_ = *readMetric(<-ch2)
+}
+
 func TestScrapeMySQLConnectionList(t *testing.T) {
 	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
 		for c, m := range mySQLconnectionListMetrics {
@@ -587,7 +705,7 @@ func TestExporter(t *testing.T) {
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {

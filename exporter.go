@@ -35,6 +35,7 @@ type Exporter struct {
 	scrapeMySQLConnectionPool        bool
 	scrapeMySQLConnectionList        bool
 	scrapeDetailedMySQLProcessList   bool
+	scrapeMySQLRuntimeServers        bool
 	scrapeMemoryMetrics              bool
 	scrapeMySQLCommandCounterMetrics bool
 	scrapesTotal                     prometheus.Counter
@@ -52,6 +53,7 @@ func NewExporter(
 	scrapeMySQLConnectionPool bool,
 	scrapeMySQLConnectionList bool,
 	scrapeDetailedMySQLProcessList bool,
+	scrapeMySQLRuntimeServers bool,
 	scrapeMemoryMetrics bool,
 	scrapeMySQLCommandCounterMetrics bool,
 ) *Exporter {
@@ -61,6 +63,7 @@ func NewExporter(
 		scrapeMySQLConnectionPool:        scrapeMySQLConnectionPool,
 		scrapeMySQLConnectionList:        scrapeMySQLConnectionList,
 		scrapeDetailedMySQLProcessList:   scrapeDetailedMySQLProcessList,
+		scrapeMySQLRuntimeServers:        scrapeMySQLRuntimeServers,
 		scrapeMemoryMetrics:              scrapeMemoryMetrics,
 		scrapeMySQLCommandCounterMetrics: scrapeMySQLCommandCounterMetrics,
 
@@ -191,6 +194,12 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		if err = scrapeDetailedMySQLConnectionList(db, ch); err != nil {
 			log.Errorln("Error scraping for collect.stats_mysql_processlist", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.stats_mysql_processlist").Inc()
+		}
+	}
+	if e.scrapeMySQLRuntimeServers {
+		if err = scrapeMySQLRuntimeServers(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.runtime_mysql_servers", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.runtime_mysql_servers").Inc()
 		}
 	}
 	if e.scrapeMemoryMetrics {
@@ -573,6 +582,105 @@ func scrapeMySQLCommandCounterMetrics(db *sql.DB, ch chan<- prometheus.Metric) e
 	}
 
 	return rows.Err() //nolint:wrapcheck
+}
+
+const mySQLruntimeServersQuery = "SELECT hostgroup_id, hostname, port, gtid_port, * FROM runtime_mysql_servers"
+
+// https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#runtime-tables
+// key - column name in lowercase.
+var mySQLruntimeServersMetrics = map[string]*metric{
+	"status": {"status", prometheus.GaugeValue,
+		"The status of the backend server (1 - ONLINE, 2 - SHUNNED, 3 - OFFLINE_SOFT, 4 - OFFLINE_HARD)."},
+	"weight": {"weight", prometheus.GaugeValue,
+		"The bigger the weight of a server relative to other weights, the higher the probability of the server to be chosen from a hostgroup."},
+	"compression": {"compression", prometheus.GaugeValue,
+		"If the value is 1, new connections to that server will use compression."},
+	"max_connections": {"max_connections", prometheus.GaugeValue,
+		"The maximum number of connections ProxySQL will open to this backend server."},
+	"max_replication_lag": {"max_replication_lag", prometheus.GaugeValue,
+		"If greater than 0, ProxySQL will regularly monitor replication lag and if it goes beyond such threshold it will temporary shun the host until replication catches up."},
+	"use_ssl": {"use_ssl", prometheus.GaugeValue,
+		"If set to 1, connections to the backend will use SSL."},
+	"max_latency_ms": {"max_latency_ms", prometheus.GaugeValue,
+		"Ping time."},
+}
+
+// scrapeMySQLRuntimeServers collects metrics from `runtime_mysql_servers`.
+func scrapeMySQLRuntimeServers(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mySQLruntimeServersQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	// first 4 columns are fixed in our SELECT statement
+	scan := make([]interface{}, len(columns))
+	var hostgroupID, hostname, port, gtidPort string
+	scan[0], scan[1], scan[2], scan[3] = &hostgroupID, &hostname, &port, &gtidPort
+	for i := 4; i < len(scan); i++ {
+		scan[i] = new(string)
+	}
+
+	var value float64
+	var valueS, column string
+	for rows.Next() {
+		if err = rows.Scan(scan...); err != nil {
+			return err
+		}
+
+		for i := 4; i < len(columns); i++ {
+			valueS = *(scan[i].(*string))
+			column = strings.ToLower(columns[i])
+			switch column {
+			case "hostgroup_id", "hostname", "port", "gtid_port":
+				continue
+			case "status":
+				switch valueS {
+				case "ONLINE":
+					value = 1
+				case "SHUNNED":
+					value = 2
+				case "OFFLINE_SOFT":
+					value = 3
+				case "OFFLINE_HARD":
+					value = 4
+				}
+			default:
+				// We could use rows.ColumnTypes() when mysql driver supports them:
+				//   https://github.com/go-sql-driver/mysql/issues/595
+				// For now, we assume every other value is a float.
+				value, err = strconv.ParseFloat(valueS, 64)
+				if err != nil {
+					log.Debugf("column %s: %s", column, err)
+					continue
+				}
+			}
+
+			m := mySQLruntimeServersMetrics[column]
+			if m == nil {
+				m = &metric{
+					name:      column,
+					valueType: prometheus.UntypedValue,
+					help:      "Undocumented runtime_mysql_servers metric.",
+				}
+			}
+			ch <- prometheus.MustNewConstMetric(
+				prometheus.NewDesc(
+					prometheus.BuildFQName(namespace, "runtime_servers", m.name),
+					m.help,
+					[]string{"hostgroup", "endpoint", "gtid_port"}, nil,
+				),
+				m.valueType, value,
+				hostgroupID, hostname+":"+port, gtidPort,
+			)
+		}
+	}
+	return rows.Err()
 }
 
 const memoryMetricsQuery = "select Variable_Name, Variable_Value  from stats_memory_metrics"
